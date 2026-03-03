@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ASTF Secure Mail Node</title>
+<style>
+body { background-color:#0b0f14; color:#8fffa3; font-family:Consolas, monospace; margin:0; padding:0; }
+.container { max-width: 900px; margin:auto; padding:40px; }
+h1,h2,h3 { color:#7fffaa; }
+input, select, textarea, button { width:100%; padding:8px; margin:6px 0 12px 0; background-color:#0f1620; border:1px solid #1c2733; color:#8fffa3; font-family:Consolas, monospace; }
+button { cursor:pointer; }
+button:hover { background-color:#1a2b38; }
+#loginForm,#mailContainer { display:none; }
+ul { list-style:none; padding:0; }
+li { cursor:pointer; padding:6px; border-bottom:1px solid #1c2733; }
+li:hover { background-color:#13212b; }
+textarea { resize:vertical; }
+.folders { display:flex; gap:20px; }
+.folder { flex:1; }
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>ASTF Secure Mail Node</h1>
+
+<!-- Login Form -->
+<div id="loginForm">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Authenticate</button>
+    <div id="loginMessage"></div>
+</div>
+
+<!-- Mail Container -->
+<div id="mailContainer">
+    <h2>Welcome, <span id="userDisplay"></span></h2>
+
+    <div class="folders">
+        <!-- Inbox -->
+        <div class="folder">
+            <h3>Inbox</h3>
+            <ul id="inbox"></ul>
+        </div>
+
+        <!-- Sent -->
+        <div class="folder">
+            <h3>Sent Messages</h3>
+            <ul id="sent"></ul>
+        </div>
+    </div>
+
+    <!-- Compose -->
+    <div style="margin-top:20px;">
+        <h3>Compose Message</h3>
+        <label>To:</label>
+        <select id="toUser"></select>
+        <label>Subject:</label>
+        <input type="text" id="subject" placeholder="Subject">
+        <label>Message:</label>
+        <textarea id="body" rows="6" placeholder="Write your message here"></textarea>
+        <button onclick="sendMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+// --- Users and Roles ---
+let defaultUsers = [
+    {username:"bd", password:"M1KUM1KUCALLMEM1KU", role:"Rookie", inbox:[], sent:[], firstLogin:true},
+    {username:"tomcat", password:"ELSAILGRA", role:"LT", inbox:[], sent:[], firstLogin:true},
+    {username:"ash", password:"9dZzUPUK]kr*c2E3]r+shEd7", role:"Tech Rookie", inbox:[], sent:[], firstLogin:true},
+    {username:"johnny", password:"H3R3C0M3SJ0HNNY", role:"Private", inbox:[], sent:[], firstLogin:true},
+    {username:"astf", password:"TASKFORCE", role:"Admin", inbox:[], sent:[], firstLogin:true}
+];
+
+// Load from localStorage or initialize
+let users = JSON.parse(localStorage.getItem("astfUsers")) || defaultUsers;
+localStorage.setItem("astfUsers", JSON.stringify(users));
+
+let currentUser = null;
+
+// --- Login Function ---
+function login() {
+    const username = document.getElementById("username").value.trim().toLowerCase();
+    const password = document.getElementById("password").value;
+
+    const user = users.find(u => u.username === username && u.password === password);
+    if(!user){
+        document.getElementById("loginMessage").textContent = "Authentication failed. Access denied.";
+        return;
+    }
+
+    currentUser = user;
+    document.getElementById("loginForm").style.display = "none";
+    document.getElementById("mailContainer").style.display = "block";
+    document.getElementById("userDisplay").textContent = currentUser.username;
+
+    // Preload welcome email on first login
+    if(currentUser.firstLogin){
+        currentUser.inbox.push({
+            from: "ASTF Taskforce",
+            subject: "Welcome to the ASTF Secure Mail Node",
+            body: `Greetings Operative,
+
+You have been granted access to the Anti-Secrecy Taskforce Secure Mail Node. This system is intended for official communications only.
+
+All correspondence is monitored and logged in accordance with ASTF operational protocol. Please ensure that all messages adhere to procedural standards and report any irregular activity immediately.
+
+For assistance, refer to the Secure Mail Node User Guide or contact ASTF Taskforce directly.
+
+— ASTF Taskforce`,
+            date: new Date().toISOString().split("T")[0]
+        });
+        currentUser.firstLogin = false;
+        saveUsers();
+    }
+
+    loadInbox();
+    loadSent();
+    populateRecipients();
+}
+
+// --- Save users to localStorage ---
+function saveUsers(){
+    const idx = users.findIndex(u=>u.username===currentUser.username);
+    users[idx] = currentUser;
+    localStorage.setItem("astfUsers", JSON.stringify(users));
+}
+
+// --- Load Inbox ---
+function loadInbox(){
+    const inboxEl = document.getElementById("inbox");
+    inboxEl.innerHTML = "";
+    currentUser.inbox.forEach((msg,i)=>{
+        const li = document.createElement("li");
+        li.textContent = `${msg.date} | ${msg.from} | ${msg.subject}`;
+        li.onclick = ()=>alert(`From: ${msg.from}\nDate: ${msg.date}\n\n${msg.body}`);
+        inboxEl.appendChild(li);
+    });
+}
+
+// --- Load Sent Messages ---
+function loadSent(){
+    const sentEl = document.getElementById("sent");
+    sentEl.innerHTML = "";
+    currentUser.sent.forEach((msg,i)=>{
+        const li = document.createElement("li");
+        li.textContent = `${msg.date} | To: ${msg.to} | ${msg.subject}`;
+        li.onclick = ()=>alert(`To: ${msg.to}\nDate: ${msg.date}\n\n${msg.body}`);
+        sentEl.appendChild(li);
+    });
+}
+
+// --- Populate Recipients ---
+function populateRecipients(){
+    const toSelect = document.getElementById("toUser");
+    toSelect.innerHTML = "";
+    users.forEach(u=>{
+        if(u.username !== currentUser.username){
+            const opt = document.createElement("option");
+            opt.value = u.username;
+            opt.textContent = u.username;
+            toSelect.appendChild(opt);
+        }
+    });
+}
+
+// --- Send Message ---
+function sendMessage(){
+    const toUser = document.getElementById("toUser").value;
+    const subject = document.getElementById("subject").value.trim() || "(No Subject)";
+    const body = document.getElementById("body").value.trim() || "(No Body)";
+    const recipient = users.find(u=>u.username===toUser);
+    if(!recipient) return alert("Recipient not found.");
+
+    const message = {
+        from: currentUser.username,
+        subject,
+        body,
+        date: new Date().toISOString().split("T")[0]
+    };
+
+    // Add to recipient inbox
+    recipient.inbox.push(message);
+    saveUsers();
+
+    // Add to sender's sent folder
+    currentUser.sent.push({
+        to: toUser,
+        subject,
+        body,
+        date: new Date().toISOString().split("T")[0]
+    });
+    saveUsers();
+
+    alert("Message sent!");
+    document.getElementById("subject").value="";
+    document.getElementById("body").value="";
+    loadSent();
+}
+</script>
+
+<script>
+// Show login on page load
+document.getElementById("loginForm").style.display = "block";
+</script>
+
+</body>
+</html>
